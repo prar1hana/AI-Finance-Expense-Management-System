@@ -2,7 +2,36 @@
 
 A full-stack personal finance management application with AI-powered expense categorization and a conversational finance assistant.
 
-![Dashboard](image.png)
+![Dashboard](assets/image.png)
+
+---
+
+## What Was Built
+
+### Backend (`backend/`) — Spring Boot 3.3, Java 21, H2, JWT
+- 4 JPA entities: User, Expense, Income, Budget
+- 7 REST controllers with full CRUD + pagination + filtering
+- Gemini AI integration — expense categorization + finance chat using real user data
+- Global exception handling with proper HTTP status codes
+- 30 unit/integration tests — all passing
+
+### Frontend (`frontend/`) — React 18, Vite, Tailwind CSS (dark theme), Recharts
+- 7 pages: Login, Register, Dashboard, Expenses, Income, Budgets, AI Chat
+- Dashboard with 3 charts (monthly spending bar, category pie, budget utilization bar)
+- AI expense form with one-click "Suggest Category" button
+- AI chat with suggested questions, conversation history, typing indicator
+
+---
+
+## Screenshots
+
+![Expenses](assets/image-1.png)
+![Income](assets/image-2.png)
+![Budgets](assets/image-3.png)
+![AI Chat](assets/image-4.png)
+![Dashboard Charts](assets/image-5.png)
+
+---
 
 ## Tech Stack
 
@@ -16,25 +45,12 @@ A full-stack personal finance management application with AI-powered expense cat
 
 ---
 
-## Features
-
-- **Expense Management** — CRUD with category and date filtering, pagination
-- **Income Management** — CRUD with source categorization
-- **Budget Management** — Monthly budgets with real-time spending tracking and exceeded warnings
-- **Dashboard** — Balance overview, monthly spending chart, category breakdown pie chart, budget utilization, recent transactions
-- **AI Expense Categorization** — One-click category suggestion from expense description using Gemini
-- **AI Finance Chat** — Ask questions about your real transactions; answers are grounded in your actual data
-
----
-
 ## Prerequisites
 
-Make sure you have the following installed:
-
 - **Java 21+** — [Download](https://adoptium.net/)
-- **Maven 3.9+** — [Download](https://maven.apache.org/download.cgi) or install via Homebrew: `brew install maven`
-- **Node.js 20+** and **npm 10+** — [Download](https://nodejs.org/)
-- **Google Gemini API key** — Get one free at [Google AI Studio](https://aistudio.google.com/app/apikey)
+- **Maven 3.9+** — `brew install maven`
+- **Node.js 20+** — [Download](https://nodejs.org/)
+- **Google Gemini API key** — [Get one free](https://aistudio.google.com/app/apikey)
 
 ---
 
@@ -64,7 +80,7 @@ This is configured in `backend/src/main/resources/application.properties`:
 gemini.api.url=https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent
 ```
 
-**To switch to a different model** (e.g. `gemini-2.5-pro`, `gemini-flash-latest`), change only the model name in that URL. To find models available for your API key, call:
+**To switch to a different model** (e.g. `gemini-2.5-pro`), change only the model name in that URL. To find models available for your API key:
 ```bash
 curl "https://generativelanguage.googleapis.com/v1beta/models?key=YOUR_KEY" | grep '"name"'
 ```
@@ -76,9 +92,7 @@ cd backend
 mvn spring-boot:run -Dspring-boot.run.profiles=dev "-Dspring-boot.run.jvmArguments=-XX:+EnableDynamicAgentLoading"
 ```
 
-Wait for: `Started FinanceAiApplication` in the output.
-
-Backend runs at **http://localhost:8080**
+Wait for `Started FinanceAiApplication` in the output. Backend runs at **http://localhost:8080**
 
 ### 4. Start the frontend
 
@@ -103,9 +117,38 @@ A demo account with sample data is pre-loaded on every backend start:
 | Email | demo@example.com |
 | Password | password123 |
 
-Sample data includes: 10 expenses, 2 income records, 5 budgets for the current month.
-
+Sample data includes: 10 expenses, 2 income records, 5 budgets for the current month.  
 You can also register a new account at http://localhost:5173/register
+
+---
+
+## Database Notes
+
+Data is **in-memory only** — it resets on every backend restart. This is expected H2 behavior for development.
+
+**To view the database while the backend is running:**
+- Open http://localhost:8080/h2-console
+- JDBC URL: `jdbc:h2:mem:financedb`
+- Username: `sa`, Password: *(leave empty)*
+- Run queries like `SELECT * FROM EXPENSES`, or export to CSV
+
+**The mock data** is loaded by `DataLoader.java` — a Spring `CommandLineRunner` that runs automatically on startup and inserts the demo account + sample records.
+
+### Switching to file-based H2 (data persists across restarts)
+
+In `backend/src/main/resources/application-dev.properties`, make these two changes:
+
+```properties
+# Change this:
+spring.datasource.url=jdbc:h2:mem:financedb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+# To this:
+spring.datasource.url=jdbc:h2:file:./data/financedb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;AUTO_SERVER=TRUE
+
+# Change this:
+spring.jpa.hibernate.ddl-auto=create-drop
+# To this:
+spring.jpa.hibernate.ddl-auto=update
+```
 
 ---
 
@@ -120,32 +163,9 @@ mvn test
 
 ---
 
-## Project Structure
-
-```
-├── backend/                          # Spring Boot application
-│   └── src/main/java/com/financeai/
-│       ├── config/                   # Security, CORS, DataLoader
-│       ├── controller/               # 7 REST controllers
-│       ├── dto/                      # Request/Response DTOs
-│       ├── entity/                   # JPA entities
-│       ├── exception/                # Global exception handling
-│       ├── repository/               # Spring Data JPA repositories
-│       ├── security/                 # JWT provider and filter
-│       └── service/                  # Business logic
-│
-└── frontend/                         # React + Vite application
-    └── src/
-        ├── api/                      # Axios API modules
-        ├── components/               # Charts, forms, layout, common UI
-        ├── context/                  # Auth context
-        ├── pages/                    # Dashboard, Expenses, Income, Budgets, AI Chat
-        └── utils/                    # Formatters and constants
-```
-
----
-
 ## API Endpoints
+
+All authenticated endpoints require: `Authorization: Bearer <token>`
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
@@ -165,21 +185,71 @@ mvn test
 | POST | `/api/ai/categorize` | Yes | Suggest category from description |
 | POST | `/api/ai/chat` | Yes | Finance assistant chat |
 
-All authenticated endpoints require: `Authorization: Bearer <token>`
+---
+
+## Project Structure
+
+```
+├── backend/
+│   └── src/main/java/com/financeai/
+│       ├── config/          # Security, CORS, DataLoader
+│       ├── controller/      # 7 REST controllers
+│       ├── dto/             # Request/Response DTOs
+│       ├── entity/          # JPA entities
+│       ├── exception/       # Global exception handling
+│       ├── repository/      # Spring Data JPA repositories
+│       ├── security/        # JWT provider and filter
+│       └── service/         # Business logic
+│
+└── frontend/
+    └── src/
+        ├── api/             # Axios API modules
+        ├── components/      # Charts, forms, layout, common UI
+        ├── context/         # Auth context
+        ├── pages/           # All 7 pages
+        └── utils/           # Formatters and constants
+```
 
 ---
 
-## H2 Database Console (dev only)
+## Security
 
-While the backend is running: http://localhost:8080/h2-console
-- JDBC URL: `jdbc:h2:mem:financedb`
-- Username: `sa`
-- Password: *(leave empty)*
+- JWT stored client-side, all endpoints protected except `/api/auth/**`
+- BCrypt password hashing (strength 10)
+- User data isolation — users can only access their own records
+- Input validation on all request DTOs
+- CORS restricted to `localhost:5173`
+
+### Not implemented (future improvements)
+- Email verification on registration
+- Forgot password / reset flow
+- Rate limiting on login endpoint
+- Account lockout after failed attempts
 
 ---
 
-## Notes
+## Real Bank Data Integration (Future)
 
-- Data is **in-memory only** — resets on every backend restart (by design for dev/demo)
-- The Gemini API key is **never committed** — `application-dev.properties` is gitignored
-- This is a **simulated** finance app — no real payments or bank connections
+Currently all data is entered manually. For read-only transaction fetching in India:
+
+![Integration Options](assets/image-6.png)
+
+**Most practical option right now — CSV Import:**  
+GPay and Paytm both allow exporting transaction history as CSV. A future "Import CSV" feature could:
+1. User exports CSV from GPay/Paytm app
+2. Uploads it to this app
+3. AI auto-categorizes each transaction
+
+For a full API-based solution, **Setu Account Aggregator** (`setu.co`) is the RBI-regulated standard — all major banks are mandated to support it and it has a free sandbox.
+
+---
+
+## Security Audit
+
+![Security](assets/image-7.png)
+
+---
+
+## Scope
+
+This is a **simulated** finance management application. It does not connect to real bank accounts, process real payments, or perform UPI transfers.
